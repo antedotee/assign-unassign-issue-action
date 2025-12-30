@@ -1,0 +1,29 @@
+name: Handle Issue Assignment
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  assign-unassign:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Handle /assign and /unassign commands
+        uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          max-concurrent-assignees: '1'
+          auto-unassign-days: '7'
+          max-assignments-per-user: '3'
+          prevent-self-assignment: 'false'
+          enable-reminder-messages: 'true'
+          reminder-message-template: '{days}/{totalDays} days remaining'
+          unassigned-label: 'unassigned'
+          unlimited-users: 'maintainer1,maintainer2'
+          assignment-success-message: 'Assigned to you @{username}, make sure to remember the {days} day deadline'
+          max-assignment-reached-message: 'Max assignment reached, first solve the earlier issues or unassign the issue'
+          unassign-request-message: 'This issue was previously unassigned. Please ask the maintainer to assign you the issue manually'
+

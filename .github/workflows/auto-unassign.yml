@@ -1,0 +1,33 @@
+name: Auto-unassign Issues
+
+on:
+    schedule:
+        # Run daily at 00:00 UTC
+        - cron: "0 0 * * *"
+    workflow_dispatch: # Allow manual triggering
+        inputs:
+            auto-unassign-days:
+                description: "Number of days before auto-unassignment"
+                required: false
+                default: "7"
+            enable-reminder-messages:
+                description: "Enable reminder messages"
+                required: false
+                default: false
+                type: boolean
+
+jobs:
+    auto-unassign:
+        runs-on: ubuntu-latest
+        permissions:
+            issues: write
+            contents: read
+        steps:
+            - name: Auto-unassign expired issues
+              uses: ./
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  auto-unassign-days: ${{ inputs.auto-unassign-days || '7' }}
+                  unassigned-label: "unassigned"
+                  enable-reminder-messages: ${{ inputs.enable-reminder-messages && 'true' || 'false' }}
+                  reminder-message-template: "{days}/{totalDays} days remaining"

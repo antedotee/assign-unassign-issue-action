@@ -1,0 +1,60 @@
+name: 'Assign/Unassign Issue Action'
+description: 'Automatically assign and unassign issues based on comments with configurable limits and auto-unassignment'
+author: 'GitHub Actions'
+branding:
+  icon: 'user-check'
+  color: 'blue'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+  max-concurrent-assignees:
+    description: 'Maximum number of concurrent assignees per issue'
+    required: false
+    default: '1'
+  auto-unassign-days:
+    description: 'Number of days after assignment before auto-unassignment'
+    required: false
+    default: '7'
+  max-assignments-per-user:
+    description: 'Maximum number of issues a user can have assigned'
+    required: false
+    default: '3'
+  prevent-self-assignment:
+    description: 'Prevent users from assigning themselves (true/false)'
+    required: false
+    default: 'false'
+  enable-reminder-messages:
+    description: 'Enable automated reminder messages about days remaining (true/false)'
+    required: false
+    default: 'false'
+  reminder-message-template:
+    description: 'Custom message template for reminders. Use {days} and {totalDays} placeholders'
+    required: false
+    default: '{days}/{totalDays} days remaining'
+  unassigned-label:
+    description: 'Label to add when issue is unassigned (prevents re-assignment)'
+    required: false
+    default: 'unassigned'
+  unlimited-users:
+    description: 'Comma-separated list of usernames with no assignment limits'
+    required: false
+    default: ''
+  assignment-success-message:
+    description: 'Message to post when assignment succeeds. Use {username} and {days} placeholders'
+    required: false
+    default: 'Assigned to you @{username}, make sure to remember the {days} day deadline'
+  max-assignment-reached-message:
+    description: 'Message when user reaches max assignments'
+    required: false
+    default: 'Max assignment reached, first solve the earlier issues or unassign the issue'
+  unassign-request-message:
+    description: 'Message when trying to assign after unassignment'
+    required: false
+    default: 'This issue was previously unassigned. Please ask the maintainer to assign you the issue manually'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
