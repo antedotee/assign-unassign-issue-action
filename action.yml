@@ -42,9 +42,9 @@ inputs:
     required: false
     default: ''
   assignment-success-message:
-    description: 'Message to post when assignment succeeds. Use {username} and {days} placeholders'
+    description: 'Message to post when assignment succeeds. Use {username} (will be replaced with @username) and {days} placeholders'
     required: false
-    default: 'Assigned to you @{username}, make sure to remember the {days} day deadline'
+    default: 'Assigned to you {username}, make sure to remember the {days} day deadline'
   max-assignment-reached-message:
     description: 'Message when user reaches max assignments'
     required: false

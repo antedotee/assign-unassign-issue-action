@@ -104,10 +104,14 @@ async function handleAssign({
 }) {
   // Check if issue has unassigned label
   if (issueLabels.includes(unassignedLabel)) {
+    // Ensure the message tags the user if it doesn't already
+    const message = unassignRequestMessage.includes(`@${commenter}`) 
+      ? unassignRequestMessage 
+      : `@${commenter} ${unassignRequestMessage}`;
     await octokit.rest.issues.createComment({
       ...repo,
       issue_number: issueNumber,
-      body: unassignRequestMessage
+      body: message
     });
     return;
   }
@@ -117,7 +121,7 @@ async function handleAssign({
     await octokit.rest.issues.createComment({
       ...repo,
       issue_number: issueNumber,
-      body: `You are already assigned to this issue.`
+      body: `@${commenter} You are already assigned to this issue.`
     });
     return;
   }
@@ -127,7 +131,7 @@ async function handleAssign({
     await octokit.rest.issues.createComment({
       ...repo,
       issue_number: issueNumber,
-      body: `Self-assignment is not allowed. Please ask a maintainer to assign you.`
+      body: `@${commenter} Self-assignment is not allowed. Please ask a maintainer to assign you.`
     });
     return;
   }
@@ -137,7 +141,7 @@ async function handleAssign({
     await octokit.rest.issues.createComment({
       ...repo,
       issue_number: issueNumber,
-      body: `Maximum concurrent assignees (${maxConcurrentAssignees}) reached for this issue.`
+      body: `@${commenter} Maximum concurrent assignees (${maxConcurrentAssignees}) reached for this issue.`
     });
     return;
   }
@@ -146,10 +150,14 @@ async function handleAssign({
   if (!unlimitedUsers.includes(commenter)) {
     const userAssignments = await getUserAssignments(octokit, repo, commenter);
     if (userAssignments >= maxAssignmentsPerUser) {
+      // Ensure the message tags the user if it doesn't already
+      const message = maxAssignmentReachedMessage.includes(`@${commenter}`) 
+        ? maxAssignmentReachedMessage 
+        : `@${commenter} ${maxAssignmentReachedMessage}`;
       await octokit.rest.issues.createComment({
         ...repo,
         issue_number: issueNumber,
-        body: maxAssignmentReachedMessage
+        body: message
       });
       return;
     }
@@ -164,9 +172,12 @@ async function handleAssign({
   });
 
   // Post success message
-  const message = assignmentSuccessMessage
-    .replace('{username}', commenter)
-    .replace('{days}', autoUnassignDays.toString());
+  // Replace {username} with @username format for proper tagging
+  // Handle both @{username} and {username} formats in template
+  let message = assignmentSuccessMessage
+    .replace(/@\{username\}/g, `@${commenter}`)  // Replace @{username} with @username
+    .replace(/\{username\}/g, `@${commenter}`)   // Replace {username} with @username
+    .replace(/\{days\}/g, autoUnassignDays.toString());
   
   await octokit.rest.issues.createComment({
     ...repo,
@@ -209,6 +220,13 @@ async function handleUnassign({
     // Label might already exist, ignore error
     core.info(`Label ${unassignedLabel} might already exist: ${error.message}`);
   }
+
+  // Post confirmation message
+  await octokit.rest.issues.createComment({
+    ...repo,
+    issue_number: issueNumber,
+    body: `@${commenter} You have been unassigned from this issue.`
+  });
 
   core.info(`Unassigned ${commenter} from issue #${issueNumber}`);
 }
