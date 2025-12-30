@@ -8,4 +8,5 @@ coverage/
 *.swp
 *.swo
 *~
+.cursor/
 
