@@ -53,6 +53,10 @@ inputs:
     description: 'Message when trying to assign after unassignment'
     required: false
     default: 'This issue was previously unassigned. Please ask the maintainer to assign you the issue manually'
+  suggest-assign-automated-comment:
+    description: 'Automatically detect assignment requests from comments and issue descriptions (true/false)'
+    required: false
+    default: 'true'
 
 runs:
   using: 'node20'

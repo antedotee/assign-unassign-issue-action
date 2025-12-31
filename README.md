@@ -84,7 +84,8 @@ All configuration options are available as inputs. Only `github-token` is requir
 | `unlimited-users` | Comma-separated list of usernames with no assignment limits | No | `` | `"maintainer1,maintainer2"` |
 | `assignment-success-message` | Message posted when assignment succeeds. Use `{username}` (replaced with @username) and `{days}` placeholders | No | `Assigned to you {username}, make sure to remember the {days} day deadline` | `"🎉 {username} assigned! {days} days to complete"` |
 | `max-assignment-reached-message` | Message when user reaches max assignments | No | `Max assignment reached, first solve the earlier issues or unassign the issue` | `"❌ Limit reached. Complete existing issues first."` |
-| `unassign-request-message` | Message when trying to assign after unassignment | No | `This issue was previously unassigned. Please ask the maintainer to assign you the issue manually` | `"🔒 Previously unassigned. Contact maintainer."` |
+| `unassign-request-message` | Message when trying to assign after unassignment | No | `This issue was previously unassigned. Please ask the maintainer to assign you the issue manually` |
+| `suggest-assign-automated-comment` | Automatically detect assignment requests from comments and issue descriptions (`true`/`false`) | No | `false` | `"true"` |
 
 ### Input Details
 
@@ -143,6 +144,21 @@ All configuration options are available as inputs. Only `github-token` is requir
   - Exceed `max-assignments-per-user` limit
 - **Format**: `"user1,user2,user3"` (no @ symbols)
 
+#### `suggest-assign-automated-comment`
+- **Purpose**: Automatically detects assignment requests from comments and issue descriptions
+- **Behavior**: When enabled, scans text for phrases like:
+  - "I want to work on this"
+  - "Please assign me"
+  - "I'll work on this"
+  - "I can take this"
+  - "Let me work on this"
+  - And many other variations
+- **Detection**: 
+  - Checks comment text when someone comments
+  - Also checks the issue description for assignment requests
+- **Action**: Automatically assigns the user if an assignment request is detected
+- **Validation**: All normal checks still apply (limits, self-assignment prevention, etc.)
+
 #### Message Templates
 All message inputs support placeholders:
 - `{username}` - Replaced with `@username` format
@@ -198,6 +214,23 @@ All message inputs support placeholders:
     enable-reminder-messages: 'true'
     reminder-message-template: '{days}/{totalDays} days remaining'
 ```
+
+### Example 5: Automatic Assignment Detection
+
+```yaml
+- uses: your-username/assign-unassign-issue-action@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    # Enable automatic detection of assignment requests
+    suggest-assign-automated-comment: 'true'
+    max-concurrent-assignees: '1'
+    auto-unassign-days: '7'
+```
+
+**How it works:**
+- When someone comments phrases like "I want to work on this" or "Please assign me", they are automatically assigned
+- Also checks the issue description for assignment requests
+- All normal validation checks still apply (limits, self-assignment prevention, etc.)
 
 ## How It Works
 

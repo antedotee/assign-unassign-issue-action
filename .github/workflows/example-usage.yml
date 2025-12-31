@@ -55,3 +55,7 @@ jobs:
           # Optional: Message when trying to assign after unassignment
           # (default: 'This issue was previously unassigned. Please ask the maintainer to assign you the issue manually')
           unassign-request-message: "This issue was previously unassigned. Please ask the maintainer to assign you the issue manually"
+
+          # Optional: Automatically detect assignment requests from comments and issue descriptions - 'true' or 'false' (default: 'false')
+          # When enabled, detects phrases like "I want to work on this", "Please assign me", etc.
+          suggest-assign-automated-comment: "false"

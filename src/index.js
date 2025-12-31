@@ -48,6 +48,7 @@ async function run() {
       'Max assignment reached, first solve the earlier issues or unassign the issue';
     const unassignRequestMessage = core.getInput('unassign-request-message') || 
       'This issue was previously unassigned. Please ask the maintainer to assign you the issue manually';
+    const suggestAssignAutomatedComment = core.getInput('suggest-assign-automated-comment') === 'true';
 
     // Handle /assign command
     if (commentBody === '/assign') {
@@ -79,6 +80,50 @@ async function run() {
         assignees,
         unassignedLabel
       });
+    }
+    // Handle automatic assignment detection from comments and issue description
+    else if (suggestAssignAutomatedComment) {
+      // Check comment for assignment request
+      const assignmentRequestedInComment = detectAssignmentRequest(commentBody);
+      
+      // Also check issue description if comment doesn't have assignment request
+      // Only check issue description if the commenter is the issue opener
+      let assignmentRequestedInDescription = false;
+      if (!assignmentRequestedInComment) {
+        try {
+          const { data: issueData } = await octokit.rest.issues.get({
+            ...repo,
+            issue_number: issueNumber
+          });
+          // Only check issue description if commenter is the issue opener
+          if (issueData.user && issueData.user.login === commenter) {
+            const issueDescription = issueData.body || '';
+            assignmentRequestedInDescription = detectAssignmentRequest(issueDescription);
+          }
+        } catch (error) {
+          core.warning(`Failed to fetch issue description: ${error.message}`);
+        }
+      }
+      
+      if (assignmentRequestedInComment || assignmentRequestedInDescription) {
+        await handleAssign({
+          octokit,
+          repo,
+          issueNumber,
+          commenter,
+          assignees,
+          issueLabels,
+          maxConcurrentAssignees,
+          maxAssignmentsPerUser,
+          preventSelfAssignment,
+          unassignedLabel,
+          unlimitedUsers,
+          assignmentSuccessMessage,
+          maxAssignmentReachedMessage,
+          unassignRequestMessage,
+          autoUnassignDays
+        });
+      }
     }
   } catch (error) {
     core.setFailed(error.message);
@@ -456,5 +501,52 @@ async function handleScheduledUnassign({ octokit, context }) {
   }
 }
 
-module.exports = { run, handleAssign, handleUnassign, getUserAssignments, handleScheduledUnassign };
+function detectAssignmentRequest(text) {
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+
+  const normalizedText = text.toLowerCase().trim();
+  
+  // Common phrases that indicate assignment request
+  const assignmentPhrases = [
+    'i want to work',
+    'i want to work on this',
+    'i\'d like to work',
+    'i\'d like to work on this',
+    'please assign me',
+    'please assign me this',
+    'assign me',
+    'assign me this',
+    'i\'ll work on this',
+    'i\'ll work on it',
+    'i can work on this',
+    'i can work on it',
+    'i would like to work',
+    'i would like to work on this',
+    'i\'m interested in working',
+    'i\'m interested in working on this',
+    'can i work on this',
+    'can i work on it',
+    'i want to take this',
+    'i want to take this issue',
+    'i\'ll take this',
+    'i\'ll take this issue',
+    'i can take this',
+    'i can take this issue',
+    'i\'d like to take this',
+    'i\'d like to take this issue',
+    'let me work on this',
+    'let me work on it',
+    'i\'ll handle this',
+    'i\'ll handle it',
+    'i can handle this',
+    'i can handle it'
+  ];
+
+  // Check if any phrase matches
+  return assignmentPhrases.some(phrase => normalizedText.includes(phrase));
+}
+
+module.exports = { run, handleAssign, handleUnassign, getUserAssignments, handleScheduledUnassign, detectAssignmentRequest };
 
