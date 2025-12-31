@@ -69,20 +69,84 @@ jobs:
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `github-token` | GitHub token for API access | Yes | - |
-| `max-concurrent-assignees` | Maximum concurrent assignees per issue | No | `1` |
-| `auto-unassign-days` | Days before auto-unassignment | No | `7` |
-| `max-assignments-per-user` | Max issues a user can have assigned | No | `3` |
-| `prevent-self-assignment` | Prevent self-assignment (`true`/`false`) | No | `false` |
-| `enable-reminder-messages` | Enable reminder messages (`true`/`false`) | No | `false` |
-| `reminder-message-template` | Reminder message template (use `{days}` and `{totalDays}`) | No | `{days}/{totalDays} days remaining` |
-| `unassigned-label` | Label added when issue is unassigned | No | `unassigned` |
-| `unlimited-users` | Comma-separated usernames with no limits | No | `` |
-| `assignment-success-message` | Message on successful assignment (use `{username}` and `{days}`) | No | `Assigned to you @{username}, make sure to remember the {days} day deadline` |
-| `max-assignment-reached-message` | Message when user reaches max assignments | No | `Max assignment reached, first solve the earlier issues or unassign the issue` |
-| `unassign-request-message` | Message when trying to assign after unassignment | No | `This issue was previously unassigned. Please ask the maintainer to assign you the issue manually` |
+All configuration options are available as inputs. Only `github-token` is required; all others are optional with sensible defaults.
+
+| Input | Description | Required | Default | Example |
+|-------|-------------|----------|---------|---------|
+| `github-token` | GitHub token for API access. Use `${{ secrets.GITHUB_TOKEN }}` | **Yes** | - | `${{ secrets.GITHUB_TOKEN }}` |
+| `max-concurrent-assignees` | Maximum number of concurrent assignees per issue | No | `1` | `"2"` |
+| `auto-unassign-days` | Number of days after assignment before auto-unassignment. **Supports float values for testing** (e.g., `0.01` = ~14 min, `0.1` = 2.4 hours) | No | `7` | `"7"` or `"0.1"` for testing |
+| `max-assignments-per-user` | Maximum number of issues a user can have assigned at once | No | `3` | `"5"` |
+| `prevent-self-assignment` | Prevent users from assigning themselves. Set to `'true'` to enable | No | `false` | `"true"` |
+| `enable-reminder-messages` | Enable automated reminder messages about days remaining. Set to `'true'` to enable | No | `false` | `"true"` |
+| `reminder-message-template` | Custom message template for reminders. Use `{days}` and `{totalDays}` placeholders | No | `{days}/{totalDays} days remaining` | `"⚠️ {days} days left ({totalDays} total)"` |
+| `unassigned-label` | Label to add when issue is unassigned (prevents re-assignment) | No | `unassigned` | `"needs-assignment"` |
+| `unlimited-users` | Comma-separated list of usernames with no assignment limits | No | `` | `"maintainer1,maintainer2"` |
+| `assignment-success-message` | Message posted when assignment succeeds. Use `{username}` (replaced with @username) and `{days}` placeholders | No | `Assigned to you {username}, make sure to remember the {days} day deadline` | `"🎉 {username} assigned! {days} days to complete"` |
+| `max-assignment-reached-message` | Message when user reaches max assignments | No | `Max assignment reached, first solve the earlier issues or unassign the issue` | `"❌ Limit reached. Complete existing issues first."` |
+| `unassign-request-message` | Message when trying to assign after unassignment | No | `This issue was previously unassigned. Please ask the maintainer to assign you the issue manually` | `"🔒 Previously unassigned. Contact maintainer."` |
+
+### Input Details
+
+#### `github-token` (Required)
+- **Purpose**: Authenticates API requests to GitHub
+- **Usage**: Always use `${{ secrets.GITHUB_TOKEN }}` which is automatically provided by GitHub Actions
+- **Permissions**: Requires `issues: write` and `contents: read` permissions
+
+#### `max-concurrent-assignees`
+- **Purpose**: Limits how many people can be assigned to a single issue simultaneously
+- **Use Case**: Prevents too many people from working on the same issue
+- **Example**: Set to `"1"` for single-person assignments, `"2"` for pair programming
+
+#### `auto-unassign-days`
+- **Purpose**: Automatically unassigns users after the specified number of days
+- **Float Support**: Accepts decimal values for testing:
+  - `0.01` = ~14.4 minutes
+  - `0.1` = 2.4 hours
+  - `0.5` = 12 hours
+  - `1` = 24 hours
+  - `7` = 7 days (default)
+- **Behavior**: Counts from the **first assignment date**, regardless of PR activity or temporary unassignments
+
+#### `max-assignments-per-user`
+- **Purpose**: Limits how many issues a single user can have assigned at once
+- **Use Case**: Prevents users from taking on too many issues simultaneously
+- **Bypass**: Users listed in `unlimited-users` are exempt from this limit
+
+#### `prevent-self-assignment`
+- **Purpose**: Blocks users from assigning themselves to issues
+- **Use Case**: Ensures maintainer oversight for issue assignments
+- **Bypass**: Users listed in `unlimited-users` can still self-assign
+
+#### `enable-reminder-messages`
+- **Purpose**: Sends automated reminders when deadline approaches
+- **Behavior**: Only sends reminders if:
+  - No PR exists for the issue
+  - Within 2 days of the deadline
+  - Maximum once per day
+
+#### `reminder-message-template`
+- **Placeholders**:
+  - `{days}` - Days remaining until auto-unassignment
+  - `{totalDays}` - Total days configured for auto-unassignment
+- **Example**: `"⚠️ Only {days} days left! ({totalDays} day deadline)"`
+
+#### `unassigned-label`
+- **Purpose**: Label added when an issue is unassigned (manually or automatically)
+- **Behavior**: Prevents automatic re-assignment via `/assign` command
+- **Removal**: Maintainers must manually remove the label to allow re-assignment
+
+#### `unlimited-users`
+- **Purpose**: Comma-separated list of usernames exempt from assignment limits
+- **Exemptions**: These users can:
+  - Self-assign (even if `prevent-self-assignment` is `true`)
+  - Exceed `max-assignments-per-user` limit
+- **Format**: `"user1,user2,user3"` (no @ symbols)
+
+#### Message Templates
+All message inputs support placeholders:
+- `{username}` - Replaced with `@username` format
+- `{days}` - Number of days (for assignment-success-message, this is the auto-unassign-days value)
 
 ## Examples
 
@@ -118,9 +182,21 @@ jobs:
 - uses: your-username/assign-unassign-issue-action@v1
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
-    assignment-success-message: '🎉 @{username} is now assigned! Deadline: {days} days'
+    assignment-success-message: '🎉 {username} is now assigned! Deadline: {days} days'
     max-assignment-reached-message: '❌ You have reached your assignment limit. Please complete existing issues first.'
     unassign-request-message: '🔒 This issue was previously unassigned. Contact a maintainer for manual assignment.'
+```
+
+### Example 4: Testing Configuration (Fast Auto-unassignment)
+
+```yaml
+- uses: your-username/assign-unassign-issue-action@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    # Use fractional days for quick testing
+    auto-unassign-days: '0.01'  # ~14 minutes
+    enable-reminder-messages: 'true'
+    reminder-message-template: '{days}/{totalDays} days remaining'
 ```
 
 ## How It Works

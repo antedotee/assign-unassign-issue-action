@@ -34,7 +34,7 @@ async function run() {
 
     // Get configuration
     const maxConcurrentAssignees = parseInt(core.getInput('max-concurrent-assignees') || '1');
-    const autoUnassignDays = parseInt(core.getInput('auto-unassign-days') || '7');
+    const autoUnassignDays = parseFloat(core.getInput('auto-unassign-days') || '7');
     const maxAssignmentsPerUser = parseInt(core.getInput('max-assignments-per-user') || '3');
     const preventSelfAssignment = core.getInput('prevent-self-assignment') === 'true';
     const unassignedLabel = core.getInput('unassigned-label') || 'unassigned';
@@ -328,7 +328,8 @@ async function handleScheduledUnassign({ octokit, context }) {
           continue;
         }
 
-        const daysSinceAssignment = Math.floor((new Date() - assignmentDate) / (1000 * 60 * 60 * 24));
+        // Calculate days since assignment (supports fractional days for testing)
+        const daysSinceAssignment = (new Date() - assignmentDate) / (1000 * 60 * 60 * 24);
         const daysRemaining = autoUnassignDays - daysSinceAssignment;
 
         // Auto-unassign if deadline passed
@@ -367,13 +368,15 @@ async function handleScheduledUnassign({ octokit, context }) {
           }
 
           // Create unassignment message based on whether PR exists
+          // Format days for display (round to 2 decimal places for fractional days)
+          const daysFormatted = Math.round(autoUnassignDays * 100) / 100;
           let unassignMessage;
           if (hasPR) {
-            unassignMessage = `@${assignee.login} You have been automatically unassigned from this issue after ${autoUnassignDays} days. A pull request has been raised for this issue.`;
+            unassignMessage = `@${assignee.login} You have been automatically unassigned from this issue after ${daysFormatted} days. A pull request has been raised for this issue.`;
           } else {
             // Get repository owner for maintainer mention
             const repoOwner = repo.owner;
-            unassignMessage = `@${assignee.login} You have been automatically unassigned from this issue.\n\n**Reason:** No pull request was raised within the ${autoUnassignDays}-day deadline.\n\n**Next steps:**\n- If you're still working on this issue, please create a pull request and ask a maintainer (@${repoOwner}) to reassign you\n- If you're no longer working on this issue, thank you for your time!\n\nMaintainers: Please manually assign this issue if needed.`;
+            unassignMessage = `@${assignee.login} You have been automatically unassigned from this issue.\n\n**Reason:** No pull request was raised within the ${daysFormatted}-day deadline.\n\n**Next steps:**\n- If you're still working on this issue, please create a pull request and ask a maintainer (@${repoOwner}) to reassign you\n- If you're no longer working on this issue, thank you for your time!\n\nMaintainers: Please manually assign this issue if needed.`;
           }
 
           await octokit.rest.issues.createComment({
@@ -419,14 +422,18 @@ async function handleScheduledUnassign({ octokit, context }) {
             });
 
             if (!reminderSentToday) {
+              // Format days for display (round to 2 decimal places for fractional days)
+              const daysRemainingFormatted = daysRemaining > 1 
+                ? Math.round(daysRemaining * 100) / 100 
+                : Math.round(daysRemaining * 100) / 100;
+              const totalDaysFormatted = Math.round(autoUnassignDays * 100) / 100;
+              
               const reminderMessage = reminderMessageTemplate
-                .replace('{days}', daysRemaining.toString())
-                .replace('{totalDays}', autoUnassignDays.toString());
+                .replace('{days}', daysRemainingFormatted.toString())
+                .replace('{totalDays}', totalDaysFormatted.toString());
               
               // Enhanced reminder message with context
-              const enhancedReminder = daysRemaining === 1
-                ? `@${assignee.login} ⚠️ **Reminder**: ${reminderMessage} before automatic unassignment. No pull request has been raised for this issue yet. Please create a PR if you're working on it, or unassign yourself if you're no longer working on it.`
-                : `@${assignee.login} ⚠️ **Reminder**: ${reminderMessage} before automatic unassignment. No pull request has been raised for this issue yet. Please create a PR if you're working on it, or unassign yourself if you're no longer working on it.`;
+              const enhancedReminder = `@${assignee.login} ⚠️ **Reminder**: ${reminderMessage} before automatic unassignment. No pull request has been raised for this issue yet. Please create a PR if you're working on it, or unassign yourself if you're no longer working on it.`;
               
               await octokit.rest.issues.createComment({
                 ...repo,

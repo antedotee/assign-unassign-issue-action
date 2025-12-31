@@ -21,6 +21,7 @@ jobs:
           max-concurrent-assignees: "1"
 
           # Optional: Number of days after assignment before auto-unassignment (default: '7')
+          # Supports float values for testing: 0.01 (~14 min), 0.1 (2.4 hours), 0.5 (12 hours), etc.
           auto-unassign-days: "7"
 
           # Optional: Maximum number of issues a user can have assigned (default: '3')

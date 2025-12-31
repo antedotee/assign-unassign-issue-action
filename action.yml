@@ -14,7 +14,7 @@ inputs:
     required: false
     default: '1'
   auto-unassign-days:
-    description: 'Number of days after assignment before auto-unassignment'
+    description: 'Number of days after assignment before auto-unassignment (supports float values for testing, e.g., 0.1 for 2.4 hours)'
     required: false
     default: '7'
   max-assignments-per-user:
