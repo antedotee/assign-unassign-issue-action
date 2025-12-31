@@ -147,6 +147,27 @@ async function handleAssign({
   unassignRequestMessage,
   autoUnassignDays
 }) {
+  // Check if already assigned
+  if (assignees.includes(commenter)) {
+    await octokit.rest.issues.createComment({
+      ...repo,
+      issue_number: issueNumber,
+      body: `@${commenter} You are already assigned to this issue.`
+    });
+    return;
+  }
+
+  // Check concurrent assignee limit FIRST (before checking unassigned label)
+  // This ensures we show the correct message when max assignees is reached
+  if (assignees.length >= maxConcurrentAssignees) {
+    await octokit.rest.issues.createComment({
+      ...repo,
+      issue_number: issueNumber,
+      body: `@${commenter} Maximum concurrent assignees (${maxConcurrentAssignees}) reached for this issue. Please wait for others to unassign or resolve the issue.`
+    });
+    return;
+  }
+
   // Check if issue has unassigned label
   if (issueLabels.includes(unassignedLabel)) {
     // Ensure the message tags the user if it doesn't already
@@ -161,32 +182,12 @@ async function handleAssign({
     return;
   }
 
-  // Check if already assigned
-  if (assignees.includes(commenter)) {
-    await octokit.rest.issues.createComment({
-      ...repo,
-      issue_number: issueNumber,
-      body: `@${commenter} You are already assigned to this issue.`
-    });
-    return;
-  }
-
   // Check self-assignment prevention
   if (preventSelfAssignment && !unlimitedUsers.includes(commenter)) {
     await octokit.rest.issues.createComment({
       ...repo,
       issue_number: issueNumber,
       body: `@${commenter} Self-assignment is not allowed. Please ask a maintainer to assign you.`
-    });
-    return;
-  }
-
-  // Check concurrent assignee limit
-  if (assignees.length >= maxConcurrentAssignees) {
-    await octokit.rest.issues.createComment({
-      ...repo,
-      issue_number: issueNumber,
-      body: `@${commenter} Maximum concurrent assignees (${maxConcurrentAssignees}) reached for this issue. Please wait for them to resolve the issue or unassign the issue.`
     });
     return;
   }
@@ -253,18 +254,6 @@ async function handleUnassign({
     issue_number: issueNumber,
     assignees: [commenter]
   });
-
-  // Add unassigned label
-  try {
-    await octokit.rest.issues.addLabels({
-      ...repo,
-      issue_number: issueNumber,
-      labels: [unassignedLabel]
-    });
-  } catch (error) {
-    // Label might already exist, ignore error
-    core.info(`Label ${unassignedLabel} might already exist: ${error.message}`);
-  }
 
   // Post confirmation message
   await octokit.rest.issues.createComment({
