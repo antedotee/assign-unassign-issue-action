@@ -1,5 +1,8 @@
 node_modules/
-dist/
+dist/*
+!dist/index.js
+!dist/index.js.map
+!dist/licenses.txt
 *.log
 .DS_Store
 .env
