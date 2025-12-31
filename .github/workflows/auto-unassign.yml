@@ -4,10 +4,13 @@ on:
     schedule:
         # Run daily at 00:00 UTC
         - cron: "0 0 * * *"
+        # For testing with fractional days (e.g., 0.01 days = 14.4 min), run every 5 minutes
+        # Uncomment the line below for testing:
+        # - cron: "*/5 * * * *"
     workflow_dispatch: # Allow manual triggering
         inputs:
             auto-unassign-days:
-                description: "Number of days before auto-unassignment"
+                description: "Number of days before auto-unassignment (supports fractional, e.g., 0.01 for ~14 min)"
                 required: false
                 default: "7"
             enable-reminder-messages:

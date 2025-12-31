@@ -30251,7 +30251,7 @@ if (require.main === require.cache[eval('__filename')]) {
 
 async function handleScheduledUnassign({ octokit, context }) {
   const repo = context.repo;
-  const autoUnassignDays = parseInt(core.getInput('auto-unassign-days') || '7');
+  const autoUnassignDays = parseFloat(core.getInput('auto-unassign-days') || '7');
   const unassignedLabel = core.getInput('unassigned-label') || 'unassigned';
   const enableReminderMessages = core.getInput('enable-reminder-messages') === 'true';
   const reminderMessageTemplate = core.getInput('reminder-message-template') || '{days}/{totalDays} days remaining';
@@ -30387,7 +30387,11 @@ async function handleScheduledUnassign({ octokit, context }) {
           core.info(`Auto-unassigned ${assignee.login} from issue #${issue.number}`);
         }
         // Send reminder if enabled and within reminder window
-        else if (enableReminderMessages && daysRemaining > 0 && daysRemaining <= 2) {
+        // For fractional days (testing), send reminder at mid-point
+        // For normal days, send reminder when <= 2 days remaining
+        else if (enableReminderMessages) {
+          const reminderThreshold = autoUnassignDays <= 1 ? autoUnassignDays / 2 : 2;
+          if (daysRemaining > 0 && daysRemaining <= reminderThreshold) {
           // Check if a PR exists for this issue
           const { data: pulls } = await octokit.rest.pulls.list({
             ...repo,
@@ -30442,6 +30446,7 @@ async function handleScheduledUnassign({ octokit, context }) {
 
               core.info(`Sent reminder to ${assignee.login} for issue #${issue.number}`);
             }
+          }
           }
         }
       }
