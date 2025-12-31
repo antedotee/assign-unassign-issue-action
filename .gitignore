@@ -3,6 +3,7 @@ dist/*
 !dist/index.js
 !dist/index.js.map
 !dist/licenses.txt
+!dist/sourcemap-register.js
 *.log
 .DS_Store
 .env
