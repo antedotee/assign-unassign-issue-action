@@ -141,7 +141,7 @@ async function handleAssign({
     await octokit.rest.issues.createComment({
       ...repo,
       issue_number: issueNumber,
-      body: `@${commenter} Maximum concurrent assignees (${maxConcurrentAssignees}) reached for this issue.`
+      body: `@${commenter} Maximum concurrent assignees (${maxConcurrentAssignees}) reached for this issue. Please wait for them to resolve the issue or unassign the issue.`
     });
     return;
   }
@@ -298,14 +298,25 @@ async function handleScheduledUnassign({ octokit, context }) {
         per_page: 100
       });
 
-      // Find the most recent assignment event for each assignee
+      // Find the FIRST (original) assignment event for each assignee
+      // This ensures we count from the original assignment date, regardless of PR activity
+      // or temporary unassignments/reassignments
+      // 
+      // Test case: If user is assigned, creates PR, closes PR, reopens PR:
+      // - Assignment date should remain the original assignment date
+      // - Timer should continue counting from original assignment, not reset
       const assigneeDates = {};
       for (const assignee of issue.assignees) {
         const assignmentEvents = events
           .filter(e => e.event === 'assigned' && e.assignee && e.assignee.login === assignee.login)
-          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); // Sort ascending to get FIRST assignment
         
         if (assignmentEvents.length > 0) {
+          // Use the FIRST assignment date, not the most recent
+          // This ensures:
+          // 1. PR closing/reopening doesn't affect the assignment timer
+          // 2. Temporary unassignments/reassignments don't reset the timer
+          // 3. We always count from when the issue was first assigned to the user
           assigneeDates[assignee.login] = new Date(assignmentEvents[0].created_at);
         }
       }
@@ -322,6 +333,22 @@ async function handleScheduledUnassign({ octokit, context }) {
 
         // Auto-unassign if deadline passed
         if (daysSinceAssignment >= autoUnassignDays) {
+          // Check if a PR exists for this issue
+          const { data: pulls } = await octokit.rest.pulls.list({
+            ...repo,
+            state: 'open',
+            per_page: 100
+          });
+
+          // Check if any PR references this issue
+          const hasPR = pulls.some(pr => {
+            const body = (pr.body || '').toLowerCase();
+            return body.includes(`#${issue.number}`) || 
+                   body.includes(`closes #${issue.number}`) ||
+                   body.includes(`fixes #${issue.number}`) ||
+                   body.includes(`resolves #${issue.number}`);
+          });
+
           await octokit.rest.issues.removeAssignees({
             ...repo,
             issue_number: issue.number,
@@ -339,10 +366,20 @@ async function handleScheduledUnassign({ octokit, context }) {
             core.info(`Label ${unassignedLabel} might already exist: ${error.message}`);
           }
 
+          // Create unassignment message based on whether PR exists
+          let unassignMessage;
+          if (hasPR) {
+            unassignMessage = `@${assignee.login} You have been automatically unassigned from this issue after ${autoUnassignDays} days. A pull request has been raised for this issue.`;
+          } else {
+            // Get repository owner for maintainer mention
+            const repoOwner = repo.owner;
+            unassignMessage = `@${assignee.login} You have been automatically unassigned from this issue.\n\n**Reason:** No pull request was raised within the ${autoUnassignDays}-day deadline.\n\n**Next steps:**\n- If you're still working on this issue, please create a pull request and ask a maintainer (@${repoOwner}) to reassign you\n- If you're no longer working on this issue, thank you for your time!\n\nMaintainers: Please manually assign this issue if needed.`;
+          }
+
           await octokit.rest.issues.createComment({
             ...repo,
             issue_number: issue.number,
-            body: `@${assignee.login} has been automatically unassigned after ${autoUnassignDays} days.`
+            body: unassignMessage
           });
 
           core.info(`Auto-unassigned ${assignee.login} from issue #${issue.number}`);
@@ -386,10 +423,15 @@ async function handleScheduledUnassign({ octokit, context }) {
                 .replace('{days}', daysRemaining.toString())
                 .replace('{totalDays}', autoUnassignDays.toString());
               
+              // Enhanced reminder message with context
+              const enhancedReminder = daysRemaining === 1
+                ? `@${assignee.login} ⚠️ **Reminder**: ${reminderMessage} before automatic unassignment. No pull request has been raised for this issue yet. Please create a PR if you're working on it, or unassign yourself if you're no longer working on it.`
+                : `@${assignee.login} ⚠️ **Reminder**: ${reminderMessage} before automatic unassignment. No pull request has been raised for this issue yet. Please create a PR if you're working on it, or unassign yourself if you're no longer working on it.`;
+              
               await octokit.rest.issues.createComment({
                 ...repo,
                 issue_number: issue.number,
-                body: `@${assignee.login} ${reminderMessage}`
+                body: enhancedReminder
               });
 
               core.info(`Sent reminder to ${assignee.login} for issue #${issue.number}`);

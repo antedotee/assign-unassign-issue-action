@@ -14,16 +14,43 @@ jobs:
       - name: Handle /assign and /unassign commands
         uses: ./
         with:
+          # Required: GitHub token for API access
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          max-concurrent-assignees: '1'
-          auto-unassign-days: '7'
-          max-assignments-per-user: '3'
-          prevent-self-assignment: 'false'
-          enable-reminder-messages: 'true'
-          reminder-message-template: '{days}/{totalDays} days remaining'
-          unassigned-label: 'unassigned'
-          unlimited-users: 'maintainer1,maintainer2'
-          assignment-success-message: 'Assigned to you @{username}, make sure to remember the {days} day deadline'
-          max-assignment-reached-message: 'Max assignment reached, first solve the earlier issues or unassign the issue'
-          unassign-request-message: 'This issue was previously unassigned. Please ask the maintainer to assign you the issue manually'
 
+          # Optional: Maximum number of concurrent assignees per issue (default: '1')
+          max-concurrent-assignees: "1"
+
+          # Optional: Number of days after assignment before auto-unassignment (default: '7')
+          auto-unassign-days: "7"
+
+          # Optional: Maximum number of issues a user can have assigned (default: '3')
+          max-assignments-per-user: "3"
+
+          # Optional: Prevent users from assigning themselves - 'true' or 'false' (default: 'false')
+          prevent-self-assignment: "false"
+
+          # Optional: Enable automated reminder messages - 'true' or 'false' (default: 'false')
+          enable-reminder-messages: "true"
+
+          # Optional: Custom message template for reminders. Use {days} and {totalDays} placeholders
+          # (default: '{days}/{totalDays} days remaining')
+          reminder-message-template: "{days}/{totalDays} days remaining"
+
+          # Optional: Label to add when issue is unassigned (prevents re-assignment) (default: 'unassigned')
+          unassigned-label: "unassigned"
+
+          # Optional: Comma-separated list of usernames with no assignment limits (default: '')
+          unlimited-users: "maintainer1,maintainer2"
+
+          # Optional: Message to post when assignment succeeds
+          # Use {username} (will be replaced with @username) and {days} placeholders
+          # (default: 'Assigned to you {username}, make sure to remember the {days} day deadline')
+          assignment-success-message: "Assigned to you {username}, make sure to remember the {days} day deadline"
+
+          # Optional: Message when user reaches max assignments
+          # (default: 'Max assignment reached, first solve the earlier issues or unassign the issue')
+          max-assignment-reached-message: "Max assignment reached, first solve the earlier issues or unassign the issue"
+
+          # Optional: Message when trying to assign after unassignment
+          # (default: 'This issue was previously unassigned. Please ask the maintainer to assign you the issue manually')
+          unassign-request-message: "This issue was previously unassigned. Please ask the maintainer to assign you the issue manually"
