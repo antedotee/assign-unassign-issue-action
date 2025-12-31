@@ -30117,7 +30117,7 @@ async function handleAssign({
     await octokit.rest.issues.createComment({
       ...repo,
       issue_number: issueNumber,
-      body: `@${commenter} You are already assigned to this issue.`
+      body: `@${commenter}, you're already assigned to this issue.`
     });
     return;
   }
@@ -30128,7 +30128,7 @@ async function handleAssign({
     await octokit.rest.issues.createComment({
       ...repo,
       issue_number: issueNumber,
-      body: `@${commenter} Maximum concurrent assignees (${maxConcurrentAssignees}) reached for this issue. Please wait for others to unassign or resolve the issue.`
+      body: `@${commenter}, the maximum number of concurrent assignees (${maxConcurrentAssignees}) has been reached for this issue. Please wait for others to unassign themselves or resolve the issue.`
     });
     return;
   }
@@ -30152,7 +30152,7 @@ async function handleAssign({
     await octokit.rest.issues.createComment({
       ...repo,
       issue_number: issueNumber,
-      body: `@${commenter} Self-assignment is not allowed. Please ask a maintainer to assign you.`
+      body: `@${commenter}, self-assignment is not allowed for this repository. Please ask a maintainer to assign you to this issue.`
     });
     return;
   }
@@ -30224,7 +30224,7 @@ async function handleUnassign({
   await octokit.rest.issues.createComment({
     ...repo,
     issue_number: issueNumber,
-    body: `@${commenter} You have been unassigned from this issue.`
+      body: `@${commenter}, you've been unassigned from this issue.`
   });
 
   core.info(`Unassigned ${commenter} from issue #${issueNumber}`);
@@ -30371,11 +30371,11 @@ async function handleScheduledUnassign({ octokit, context }) {
           const daysFormatted = Math.round(autoUnassignDays * 100) / 100;
           let unassignMessage;
           if (hasPR) {
-            unassignMessage = `@${assignee.login} You have been automatically unassigned from this issue after ${daysFormatted} days. A pull request has been raised for this issue.`;
+            unassignMessage = `@${assignee.login}, you've been automatically unassigned from this issue after ${daysFormatted} days. A pull request has been raised for this issue, so the assignment is no longer needed.`;
           } else {
             // Get repository owner for maintainer mention
             const repoOwner = repo.owner;
-            unassignMessage = `@${assignee.login} You have been automatically unassigned from this issue.\n\n**Reason:** No pull request was raised within the ${daysFormatted}-day deadline.\n\n**Next steps:**\n- If you're still working on this issue, please create a pull request and ask a maintainer (@${repoOwner}) to reassign you\n- If you're no longer working on this issue, thank you for your time!\n\nMaintainers: Please manually assign this issue if needed.`;
+            unassignMessage = `@${assignee.login}, you've been automatically unassigned from this issue.\n\n**Reason:** No pull request was raised within the ${daysFormatted}-day deadline.\n\n**Next steps:**\n- If you're still working on this issue, please create a pull request and ask a maintainer (@${repoOwner}) to reassign you.\n- If you're no longer working on this issue, thank you for your time!\n\nMaintainers: Please manually assign this issue if needed.`;
           }
 
           await octokit.rest.issues.createComment({
@@ -30436,7 +30436,7 @@ async function handleScheduledUnassign({ octokit, context }) {
                 .replace('{totalDays}', totalDaysFormatted.toString());
               
               // Enhanced reminder message with context
-              const enhancedReminder = `@${assignee.login} ⚠️ **Reminder**: ${reminderMessage} before automatic unassignment. No pull request has been raised for this issue yet. Please create a PR if you're working on it, or unassign yourself if you're no longer working on it.`;
+              const enhancedReminder = `@${assignee.login}, ⚠️ **Reminder**: ${reminderMessage} before automatic unassignment. No pull request has been raised for this issue yet. Please create a PR if you're working on it, or use \`/unassign\` if you're no longer working on it.`;
               
               await octokit.rest.issues.createComment({
                 ...repo,

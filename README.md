@@ -1,24 +1,20 @@
 # Assign/Unassign Issue Action
 
-A GitHub Action that automates issue assignment and unassignment based on comments (`/assign` and `/unassign` commands) with configurable limits, auto-unassignment, and reminder messages.
+A GitHub Action that handles issue assignments through simple comment commands. Comment `/assign` to take on an issue, or `/unassign` to drop it. The action enforces limits, sends reminders, and can automatically unassign issues that haven't seen progress.
 
-## Features
+## What It Does
 
-- ✅ **Comment-based assignment**: Use `/assign` and `/unassign` commands in issue comments
-- ✅ **Concurrent assignee limit**: Limit how many people can be assigned to an issue (default: 1)
-- ✅ **Per-user assignment limit**: Limit how many issues a user can have assigned (default: 3)
-- ✅ **Auto-unassignment**: Automatically unassign issues after a configurable number of days (default: 7)
-- ✅ **Unassigned label protection**: Prevents re-assignment after unassignment (manual or automatic)
-- ✅ **Self-assignment prevention**: Optional toggle to prevent self-assignment
-- ✅ **Unlimited users**: Configure users who don't have assignment limits
-- ✅ **Reminder messages**: Optional automated reminders about days remaining (only sent if no PR exists for the issue)
-- ✅ **Custom messages**: Fully customizable success, error, and reminder messages
+- **Comment commands**: Use `/assign` and `/unassign` in issue comments
+- **Assignment limits**: Control how many people can work on an issue and how many issues each person can handle
+- **Auto-unassignment**: Automatically unassign issues after a set number of days if no PR is created
+- **Smart reminders**: Get notified when deadlines approach (only if no PR exists)
+- **Assignment detection**: Optionally detect when someone wants to work on an issue and suggest they use `/assign`
 
-## Usage
+## Quick Start
 
-### Basic Setup
+### Step 1: Handle Comment Commands
 
-Create a workflow file (e.g., `.github/workflows/assign-unassign.yml`):
+Create `.github/workflows/assign-unassign.yml`:
 
 ```yaml
 name: Handle Issue Assignment
@@ -40,9 +36,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### Scheduled Auto-unassignment
+### Step 2: Set Up Auto-Unassignment (Optional)
 
-Create a separate workflow for scheduled auto-unassignment (e.g., `.github/workflows/auto-unassign.yml`):
+Create `.github/workflows/auto-unassign.yml` for automatic unassignment:
 
 ```yaml
 name: Auto-unassign Issues
@@ -50,7 +46,7 @@ name: Auto-unassign Issues
 on:
   schedule:
     - cron: '0 0 * * *'  # Daily at midnight UTC
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:  # Allows manual triggering
 
 jobs:
   auto-unassign:
@@ -67,228 +63,132 @@ jobs:
           enable-reminder-messages: 'true'
 ```
 
-## Inputs
+That's it! The action will now handle assignments when people comment `/assign` or `/unassign` on issues.
 
-All configuration options are available as inputs. Only `github-token` is required; all others are optional with sensible defaults.
+## Configuration Options
 
-| Input | Description | Required | Default | Example |
-|-------|-------------|----------|---------|---------|
-| `github-token` | GitHub token for API access. Use `${{ secrets.GITHUB_TOKEN }}` | **Yes** | - | `${{ secrets.GITHUB_TOKEN }}` |
-| `max-concurrent-assignees` | Maximum number of concurrent assignees per issue | No | `1` | `"2"` |
-| `auto-unassign-days` | Number of days after assignment before auto-unassignment. **Supports float values for testing** (e.g., `0.01` = ~14 min, `0.1` = 2.4 hours) | No | `7` | `"7"` or `"0.1"` for testing |
-| `max-assignments-per-user` | Maximum number of issues a user can have assigned at once | No | `3` | `"5"` |
-| `prevent-self-assignment` | Prevent users from assigning themselves. Set to `'true'` to enable | No | `false` | `"true"` |
-| `enable-reminder-messages` | Enable automated reminder messages about days remaining. Set to `'true'` to enable | No | `false` | `"true"` |
-| `reminder-message-template` | Custom message template for reminders. Use `{days}` and `{totalDays}` placeholders | No | `{days}/{totalDays} days remaining` | `"⚠️ {days} days left ({totalDays} total)"` |
-| `unassigned-label` | Label to add when issue is unassigned (prevents re-assignment) | No | `unassigned` | `"needs-assignment"` |
-| `unlimited-users` | Comma-separated list of usernames with no assignment limits | No | `` | `"maintainer1,maintainer2"` |
-| `assignment-success-message` | Message posted when assignment succeeds. Use `{username}` (replaced with @username) and `{days}` placeholders | No | `Assigned to you {username}, make sure to remember the {days} day deadline` | `"🎉 {username} assigned! {days} days to complete"` |
-| `max-assignment-reached-message` | Message when user reaches max assignments | No | `Max assignment reached, first solve the earlier issues or unassign the issue` | `"❌ Limit reached. Complete existing issues first."` |
-| `unassign-request-message` | Message when trying to assign after unassignment | No | `This issue was previously unassigned. Please ask the maintainer to assign you the issue manually` |
-| `suggest-assign-automated-comment` | Automatically detect assignment requests from comments and issue descriptions (`true`/`false`) | No | `false` | `"true"` |
+All settings are optional except `github-token`. Here's what you can tweak:
 
-### Input Details
-
-#### `github-token` (Required)
-- **Purpose**: Authenticates API requests to GitHub
-- **Usage**: Always use `${{ secrets.GITHUB_TOKEN }}` which is automatically provided by GitHub Actions
-- **Permissions**: Requires `issues: write` and `contents: read` permissions
-
-#### `max-concurrent-assignees`
-- **Purpose**: Limits how many people can be assigned to a single issue simultaneously
-- **Use Case**: Prevents too many people from working on the same issue
-- **Example**: Set to `"1"` for single-person assignments, `"2"` for pair programming
-
-#### `auto-unassign-days`
-- **Purpose**: Automatically unassigns users after the specified number of days
-- **Float Support**: Accepts decimal values for testing:
-  - `0.01` = ~14.4 minutes
-  - `0.1` = 2.4 hours
-  - `0.5` = 12 hours
-  - `1` = 24 hours
-  - `7` = 7 days (default)
-- **Behavior**: Counts from the **first assignment date**, regardless of PR activity or temporary unassignments
-
-#### `max-assignments-per-user`
-- **Purpose**: Limits how many issues a single user can have assigned at once
-- **Use Case**: Prevents users from taking on too many issues simultaneously
-- **Bypass**: Users listed in `unlimited-users` are exempt from this limit
-
-#### `prevent-self-assignment`
-- **Purpose**: Blocks users from assigning themselves to issues
-- **Use Case**: Ensures maintainer oversight for issue assignments
-- **Bypass**: Users listed in `unlimited-users` can still self-assign
-
-#### `enable-reminder-messages`
-- **Purpose**: Sends automated reminders when deadline approaches
-- **Behavior**: Only sends reminders if:
-  - No PR exists for the issue
-  - Within 2 days of the deadline
-  - Maximum once per day
-
-#### `reminder-message-template`
-- **Placeholders**:
-  - `{days}` - Days remaining until auto-unassignment
-  - `{totalDays}` - Total days configured for auto-unassignment
-- **Example**: `"⚠️ Only {days} days left! ({totalDays} day deadline)"`
-
-#### `unassigned-label`
-- **Purpose**: Label added when an issue is unassigned (manually or automatically)
-- **Behavior**: Prevents automatic re-assignment via `/assign` command
-- **Removal**: Maintainers must manually remove the label to allow re-assignment
-
-#### `unlimited-users`
-- **Purpose**: Comma-separated list of usernames exempt from assignment limits
-- **Exemptions**: These users can:
-  - Self-assign (even if `prevent-self-assignment` is `true`)
-  - Exceed `max-assignments-per-user` limit
-- **Format**: `"user1,user2,user3"` (no @ symbols)
-
-#### `suggest-assign-automated-comment`
-- **Purpose**: Automatically detects assignment requests from comments and issue descriptions
-- **Behavior**: When enabled, scans text for phrases like:
-  - "I want to work on this"
-  - "Please assign me"
-  - "I'll work on this"
-  - "I can take this"
-  - "Let me work on this"
-  - And many other variations
-- **Detection**: 
-  - Checks comment text when someone comments
-  - Also checks the issue description for assignment requests
-- **Action**: Automatically assigns the user if an assignment request is detected
-- **Validation**: All normal checks still apply (limits, self-assignment prevention, etc.)
-
-#### Message Templates
-All message inputs support placeholders:
-- `{username}` - Replaced with `@username` format
-- `{days}` - Number of days (for assignment-success-message, this is the auto-unassign-days value)
-
-## Examples
-
-### Example 1: Basic Configuration
-
-```yaml
-- uses: your-username/assign-unassign-issue-action@v1
-  with:
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-    max-concurrent-assignees: '1'
-    auto-unassign-days: '7'
-    max-assignments-per-user: '3'
-```
-
-### Example 2: With Reminders and Self-Assignment Prevention
-
-```yaml
-- uses: your-username/assign-unassign-issue-action@v1
-  with:
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-    max-concurrent-assignees: '2'
-    auto-unassign-days: '14'
-    max-assignments-per-user: '5'
-    prevent-self-assignment: 'true'
-    enable-reminder-messages: 'true'
-    reminder-message-template: '⚠️ Only {days} days left! ({totalDays} day deadline)'
-    unlimited-users: 'maintainer1,maintainer2,admin'
-```
-
-### Example 3: Custom Messages
-
-```yaml
-- uses: your-username/assign-unassign-issue-action@v1
-  with:
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-    assignment-success-message: '🎉 {username} is now assigned! Deadline: {days} days'
-    max-assignment-reached-message: '❌ You have reached your assignment limit. Please complete existing issues first.'
-    unassign-request-message: '🔒 This issue was previously unassigned. Contact a maintainer for manual assignment.'
-```
-
-### Example 4: Testing Configuration (Fast Auto-unassignment)
-
-```yaml
-- uses: your-username/assign-unassign-issue-action@v1
-  with:
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-    # Use fractional days for quick testing
-    auto-unassign-days: '0.01'  # ~14 minutes
-    enable-reminder-messages: 'true'
-    reminder-message-template: '{days}/{totalDays} days remaining'
-```
-
-### Example 5: Automatic Assignment Detection
-
-```yaml
-- uses: your-username/assign-unassign-issue-action@v1
-  with:
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-    # Enable automatic detection of assignment requests
-    suggest-assign-automated-comment: 'true'
-    max-concurrent-assignees: '1'
-    auto-unassign-days: '7'
-```
-
-**How it works:**
-- When someone comments phrases like "I want to work on this" or "Please assign me", they are automatically assigned
-- Also checks the issue description for assignment requests
-- All normal validation checks still apply (limits, self-assignment prevention, etc.)
+| Input | What It Does | Default |
+|-------|--------------|---------|
+| `github-token` | GitHub token (always use `${{ secrets.GITHUB_TOKEN }}`) | **Required** |
+| `max-concurrent-assignees` | How many people can be assigned to one issue | `1` |
+| `auto-unassign-days` | Days before auto-unassignment (supports decimals like `0.01` for testing) | `7` |
+| `max-assignments-per-user` | Max issues one person can have assigned | `3` |
+| `prevent-self-assignment` | Block people from assigning themselves | `false` |
+| `enable-reminder-messages` | Send reminders when deadline approaches | `false` |
+| `reminder-message-template` | Custom reminder message (use `{days}` and `{totalDays}`) | `{days}/{totalDays} days remaining` |
+| `unlimited-users` | Comma-separated list of users exempt from limits | `""` |
+| `assignment-success-message` | Message when assignment succeeds (use `{username}` and `{days}`) | `Assigned to you {username}, make sure to remember the {days} day deadline` |
+| `max-assignment-reached-message` | Message when user hits their limit | `Max assignment reached, first solve the earlier issues or unassign the issue` |
+| `unassign-request-message` | Message when trying to assign after unassignment | `This issue was previously unassigned. Please ask the maintainer to assign you the issue manually` |
+| `suggest-assign-automated-comment` | Detect assignment requests and suggest `/assign` | `false` |
 
 ## How It Works
 
-### Assignment Flow (`/assign`)
+### The `/assign` Command
 
-1. User comments `/assign` on an issue
-2. Action checks:
-   - Is the issue already unassigned (has unassigned label)? → Show message
-   - Is user already assigned? → Inform user
-   - Is self-assignment prevented? → Reject if applicable
-   - Has issue reached concurrent assignee limit? → Reject
-   - Has user reached their assignment limit? → Reject (unless unlimited)
-3. If all checks pass, assign the user and post success message
+When someone comments `/assign`:
 
-### Unassignment Flow (`/unassign`)
+1. Checks if they're already assigned → tells them if so
+2. Checks if the issue is at max assignees → tells them to wait
+3. Checks if self-assignment is blocked → tells them to ask a maintainer
+4. Checks if they've hit their personal limit → tells them to finish other issues first
+5. If everything passes → assigns them and posts a success message
 
-1. User comments `/unassign` on an issue
-2. Action checks:
-   - Is user assigned to this issue? → If not, do nothing
-3. If assigned, remove assignment and add unassigned label
+### The `/unassign` Command
 
-### Auto-unassignment Flow (Scheduled)
+When someone comments `/unassign`:
 
-1. Runs on schedule (e.g., daily)
-2. Checks all open issues with assignees
-3. For each assignee, checks assignment date
-4. If assignment is older than `auto-unassign-days`:
-   - Unassigns the user
-   - Adds unassigned label
-   - Posts notification comment
-5. If reminders enabled and within 2 days of deadline:
-   - Checks if a PR exists for the issue
-   - If no PR exists, posts reminder message (once per day)
+- If they're assigned → removes them and confirms
+- If they're not assigned → does nothing (silent)
 
-## Labels
+### Auto-Unassignment
 
-The action uses a label (default: `unassigned`) to track issues that have been unassigned. This prevents automatic re-assignment until a maintainer manually removes the label.
+The scheduled workflow runs daily (or however often you configure it) and:
+
+1. Looks at all open issues with assignees
+2. Finds when each person was first assigned (uses the original assignment date, not reassignments)
+3. If the assignment is older than your deadline:
+   - Checks if there's a PR for the issue
+   - Unassigns the person
+   - Adds an "unassigned" label to prevent re-assignment
+   - Posts a message explaining what happened
+
+### Reminders
+
+If reminders are enabled, the action will:
+
+- Check issues where the deadline is approaching (within 2 days for normal deadlines, or at the mid-point for very short deadlines)
+- Only send reminders if no PR exists for the issue
+- Send at most one reminder per day
+- Skip reminders entirely if a PR references the issue
+
+### Assignment Detection
+
+When `suggest-assign-automated-comment` is enabled, the action watches for phrases like:
+- "I want to work on this"
+- "Please assign me"
+- "Can I work on this issue?"
+- And similar variations
+
+If it detects an assignment request and assignment is possible, it suggests using `/assign` instead of auto-assigning. This gives people control while making the process smoother.
+
+## Common Use Cases
+
+### Basic Setup
+Just want people to be able to assign themselves? Use the quick start above. That's all you need.
+
+### Stricter Control
+Want to prevent self-assignment and limit how many issues people take on?
+
+```yaml
+- uses: your-username/assign-unassign-issue-action@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    prevent-self-assignment: 'true'
+    max-assignments-per-user: '5'
+    max-concurrent-assignees: '1'
+```
+
+### With Reminders
+Want to remind people before they get auto-unassigned?
+
+```yaml
+- uses: your-username/assign-unassign-issue-action@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    auto-unassign-days: '14'
+    enable-reminder-messages: 'true'
+    reminder-message-template: '⚠️ Only {days} days left! ({totalDays} day deadline)'
+```
+
+### Unlimited Users
+Have maintainers who should bypass all limits?
+
+```yaml
+- uses: your-username/assign-unassign-issue-action@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    unlimited-users: 'maintainer1,maintainer2,admin'
+    prevent-self-assignment: 'true'
+```
+
+## Important Notes
+
+**Assignment dates**: The action tracks from the first time someone was assigned, not from reassignments. So if someone gets unassigned and reassigned, the timer doesn't reset.
+
+**PR detection**: The action looks for PRs that mention the issue number (like `#123` or `closes #123`). If it finds one, it won't send reminders and will note the PR in the unassignment message.
+
+**The unassigned label**: When auto-unassignment happens, an "unassigned" label is added. This prevents people from using `/assign` on that issue until a maintainer removes the label. Manual unassignment doesn't add this label.
+
+**Testing with short deadlines**: You can use fractional days like `0.01` (about 14 minutes) for testing. Just make sure your scheduled workflow runs frequently enough—GitHub Actions requires at least 5 minutes between runs. For production, stick with whole days.
 
 ## Permissions
 
-The action requires the following permissions:
-- `issues: write` - To assign/unassign and add comments
-- `contents: read` - To read repository information
-
-## Development
-
-### Building
-
-```bash
-npm install
-npm run build
-```
-
-### Testing
-
-```bash
-npm test
-```
+The action needs:
+- `issues: write` - To assign/unassign and post comments
+- `contents: read` - To read repository info
 
 ## License
 
@@ -296,5 +196,4 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
+Pull requests welcome! If you find a bug or have an idea, feel free to open an issue or submit a PR.
