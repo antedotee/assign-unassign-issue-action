@@ -86,43 +86,81 @@ async function run() {
       // Check comment for assignment request
       const assignmentRequestedInComment = detectAssignmentRequest(commentBody);
       
-      // Also check issue description if comment doesn't have assignment request
-      // Only check issue description if the commenter is the issue opener
-      let assignmentRequestedInDescription = false;
-      if (!assignmentRequestedInComment) {
-        try {
-          const { data: issueData } = await octokit.rest.issues.get({
-            ...repo,
-            issue_number: issueNumber
-          });
-          // Only check issue description if commenter is the issue opener
-          if (issueData.user && issueData.user.login === commenter) {
-            const issueDescription = issueData.body || '';
-            assignmentRequestedInDescription = detectAssignmentRequest(issueDescription);
-          }
-        } catch (error) {
-          core.warning(`Failed to fetch issue description: ${error.message}`);
+      // Early exit checks BEFORE any API calls or comments
+      // Only proceed if assignment request detected AND assignment is actually possible
+      if (assignmentRequestedInComment) {
+        // Check if already assigned - silent exit
+        if (assignees.includes(commenter)) {
+          return;
         }
+        
+        // Check if max concurrent assignees reached - silent exit
+        if (assignees.length >= maxConcurrentAssignees) {
+          return;
+        }
+        
+        // Check if issue has unassigned label - silent exit
+        if (issueLabels.includes(unassignedLabel)) {
+          return;
+        }
+        
+        // Check self-assignment prevention (no API call needed)
+        if (preventSelfAssignment && !unlimitedUsers.includes(commenter)) {
+          return;
+        }
+        
+        // Only suggest /assign command if assignment is possible
+        // Don't auto-assign, just suggest the command
+        await octokit.rest.issues.createComment({
+          ...repo,
+          issue_number: issueNumber,
+          body: `@${commenter} You can use \`/assign\` to assign yourself to this issue.`
+        });
+        return;
       }
       
-      if (assignmentRequestedInComment || assignmentRequestedInDescription) {
-        await handleAssign({
-          octokit,
-          repo,
-          issueNumber,
-          commenter,
-          assignees,
-          issueLabels,
-          maxConcurrentAssignees,
-          maxAssignmentsPerUser,
-          preventSelfAssignment,
-          unassignedLabel,
-          unlimitedUsers,
-          assignmentSuccessMessage,
-          maxAssignmentReachedMessage,
-          unassignRequestMessage,
-          autoUnassignDays
-        });
+      // Also check issue description if comment doesn't have assignment request
+      // Only check issue description if the commenter is the issue opener
+      // Only fetch if early exit checks pass
+      if (!assignmentRequestedInComment) {
+        // Early exit checks BEFORE API call
+        if (assignees.includes(commenter)) {
+          return;
+        }
+        
+        if (assignees.length >= maxConcurrentAssignees) {
+          return;
+        }
+        
+        if (issueLabels.includes(unassignedLabel)) {
+          return;
+        }
+        
+        if (preventSelfAssignment && !unlimitedUsers.includes(commenter)) {
+          return;
+        }
+        
+        // Only fetch issue description if commenter is the issue opener (from context)
+        if (context.payload.issue.user.login === commenter) {
+          try {
+            const { data: issueData } = await octokit.rest.issues.get({
+              ...repo,
+              issue_number: issueNumber
+            });
+            const issueDescription = issueData.body || '';
+            const assignmentRequestedInDescription = detectAssignmentRequest(issueDescription);
+            
+            if (assignmentRequestedInDescription) {
+              await octokit.rest.issues.createComment({
+                ...repo,
+                issue_number: issueNumber,
+                body: `@${commenter} You can use \`/assign\` to assign yourself to this issue.`
+              });
+            }
+          } catch (error) {
+            core.warning(`Failed to fetch issue description: ${error.message}`);
+          }
+        }
       }
     }
   } catch (error) {
